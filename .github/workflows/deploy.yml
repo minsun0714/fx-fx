@@ -6,7 +6,7 @@ on:
       - main
 
 env:
-  IMAGE_NAME: minsun/fx-fx
+  IMAGE_NAME: ${{ secrets.DOCKER_HUB_USERNAME }}/fx-fx
   IMAGE_TAG: latest
   COMMIT_SHA: ${{ github.sha }}
 
@@ -45,6 +45,9 @@ jobs:
           script: |
             set -e
             cd /home/${{ secrets.EC2_USER }}/fx-fx
+
+            echo "🔑 Logging in to Docker Hub..."
+            docker login -u ${{ secrets.DOCKER_HUB_USERNAME }} -p ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
 
             echo "📥 Pulling latest image..."
             docker compose pull
