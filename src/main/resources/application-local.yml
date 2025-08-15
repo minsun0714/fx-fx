@@ -1,0 +1,13 @@
+spring:
+  kafka:
+    bootstrap-servers: localhost:29092
+
+elasticsearch:
+  host: localhost
+  port: 19200
+
+influxdb:
+  url: http://localhost:8086
+  org: fx-org
+  bucket: fx-bucket
+  token: admin123

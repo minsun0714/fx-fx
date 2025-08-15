@@ -1,0 +1,13 @@
+spring:
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
+
+elasticsearch:
+  host: ${ELASTICSEARCH_HOST}
+  port: 9200
+
+influxdb:
+  url: http://${INFLUXDB_HOST}:8086
+  org: fx-org
+  bucket: fx-bucket
+  token: ${INFLUXDB_API_TOKEN}

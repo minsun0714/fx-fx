@@ -1,0 +1,24 @@
+spring:
+  application:
+    name: fx-news-app
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus  # prometheus 엔드포인트 포함
+  endpoint:
+    prometheus:
+      enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    export:
+      influx:
+        enabled: false
+
+influxdb:
+  url: http://${INFLUXDB_HOST}:8086
+  org: fx-org
+  bucket: fx-bucket
+  token: ${INFLUXDB_API_TOKEN}
