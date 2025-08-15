@@ -1,0 +1,66 @@
+name: Deploy to EC2 (Docker)
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  IMAGE_NAME: minsun/fx-fx
+  IMAGE_TAG: latest
+  COMMIT_SHA: ${{ github.sha }}
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🐳 Log in to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+
+      - name: 🛠 Build Docker image
+        run: |
+          docker build --pull --no-cache \
+            -t $IMAGE_NAME:$IMAGE_TAG \
+            -t $IMAGE_NAME:$COMMIT_SHA \
+            .
+
+      - name: 📤 Push Docker image
+        run: |
+          docker push $IMAGE_NAME:$IMAGE_TAG
+          docker push $IMAGE_NAME:$COMMIT_SHA
+
+      - name: 🚀 Deploy on EC2
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            set -e
+            cd /home/${{ secrets.EC2_USER }}/fx-fx
+
+            echo "📥 Pulling latest image..."
+            docker compose pull
+
+            echo "🧹 Stopping old containers..."
+            docker compose down
+
+            echo "🗑 Removing unused containers/images..."
+            docker container prune -f
+            docker image prune -af
+
+            echo "🚀 Starting new containers..."
+            docker compose up -d
+
+            echo "🔍 Container status:"
+            docker ps --filter "name=fx-fx"
+
+            echo "📜 Last 10 logs:"
+            docker logs --tail 10 fx-fx || true
