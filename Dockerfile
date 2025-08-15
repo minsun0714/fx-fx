@@ -7,6 +7,7 @@ WORKDIR /app
 
 # 캐시 최적화를 위해 Gradle Wrapper와 설정 먼저 복사
 COPY gradlew .
+RUN chmod +x gradlew
 COPY gradle gradle
 COPY build.gradle settings.gradle ./
 
