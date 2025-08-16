@@ -6,16 +6,15 @@ FROM eclipse-temurin:21-jdk-jammy AS builder
 WORKDIR /workspace
 
 # 1) Gradle Wrapper/설정 먼저 (캐시)
-COPY gradlew .
+COPY --chmod=0755 gradlew .
 COPY gradle gradle
 COPY build.gradle settings.gradle ./
-RUN chmod +x gradlew
 
 # 2) 의존성 프리페치 (실패해도 빌드는 계속)
 RUN ./gradlew --no-daemon dependencies || true
 
-# 3) 전체 소스 복사
-COPY . .
+# gradlew가 다시 덮어쓰이지 않도록 필요한 경로만 복사
+COPY src src
 
 # 4) Spring Boot JAR 빌드 (테스트 생략은 상황에 따라)
 RUN ./gradlew --no-daemon clean bootJar -x test
