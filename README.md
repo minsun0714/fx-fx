@@ -15,3 +15,5 @@
 | **Kafka 브로커 구성**        | 1대            | **Replication Factor = 1** | 단일 브로커, 장애 시 메시지 유실 가능                                |
 | **Elasticsearch 노드 구성** | 단일 노드         | **날짜 인덱스 관리(1샤드)**         | ILM 미사용, 삭제 없음                                        |
 
+# 환율: kafka broker로 수신한 환율을 influxDB에 저장
+<img width="2401" height="1149" alt="image" src="https://github.com/user-attachments/assets/36a78412-6324-4cbf-a037-84904e1c9d7d" />
