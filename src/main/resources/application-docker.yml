@@ -1,0 +1,51 @@
+# application-docker.yml
+spring:
+  application:
+    name: fx-news-app
+  main:
+    lazy-initialization: false
+  task:
+    scheduling:
+      enabled: true
+      thread-name-prefix: exchange-sched-
+      pool:
+        size: 2
+  kafka:
+    # 로컬 기본값: kafka:9092, 원격은 KAFKA_BOOTSTRAP_SERVERS로 덮어쓰기
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+    consumer:
+      group-id: influxdb-writer
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+  # Spring 공식 ES 설정 (선택) — 원격이면 ELASTICSEARCH_URL로 덮어쓰기
+  elasticsearch:
+    uris: ${ELASTICSEARCH_URL:http://${ELASTICSEARCH_HOST:elasticsearch}:${ELASTICSEARCH_PORT:9200}}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    prometheus:
+      enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    export:
+      influx:
+        enabled: false
+
+elasticsearch:
+  host: ${ELASTICSEARCH_HOST:elasticsearch}
+  port: ${ELASTICSEARCH_PORT:9200}
+
+influxdb:
+  url: ${INFLUXDB_URL:http://${INFLUXDB_HOST:influxdb}:${INFLUXDB_EXTERNAL_PORT:8086}}
+  org: ${INFLUXDB_ORG:${FX_INFLUX_ORG:fx-org}}
+  bucket: ${INFLUXDB_BUCKET:${FX_INFLUX_BUCKET:fx-bucket}}
+  token: ${INFLUXDB_API_TOKEN}
