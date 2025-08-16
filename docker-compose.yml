@@ -1,59 +1,81 @@
 services:
   app:
-    image: woooooooo22/fx-fx:latest
+    working_dir: /app
+    command: ./gradlew bootRun
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: app
     ports:
-      - "8080:8080"
+      - "8081:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+    env_file:
+      - .env
+    depends_on:
+      kafka:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+      influxdb:
+        condition: service_healthy
+
     networks:
       - elk-net
-  # ========================
-  # Zookeeper
-  # ========================
+
   zookeeper:
     image: confluentinc/cp-zookeeper:7.6.0
     container_name: zookeeper
     environment:
-      ZOOKEEPER_CLIENT_PORT: ${ZOOKEEPER_CLIENT_PORT}
-      ZOOKEEPER_TICK_TIME: ${ZOOKEEPER_TICK_TIME}
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+      ZOOKEEPER_4LW_COMMANDS_WHITELIST: srvr,ruok,stat
     ports:
-      - "${ZOOKEEPER_EXTERNAL_PORT}:${ZOOKEEPER_CLIENT_PORT}"
+      - "2181:2181"
     networks:
       - elk-net
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -fs http://localhost:8080/commands/stat" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  # ========================
-  # Kafka Broker (1대)
-  # ========================
   kafka:
     image: confluentinc/cp-kafka:7.6.0
     container_name: kafka
     depends_on:
-      - zookeeper
+      zookeeper:
+        condition: service_healthy
     ports:
-      - "${KAFKA_EXTERNAL_PORT}:9092"
+      - "29092:29092"
     environment:
-      KAFKA_BROKER_ID: ${KAFKA_BROKER_ID}
-      KAFKA_ZOOKEEPER_CONNECT: ${KAFKA_ZOOKEEPER_CONNECT}
-      KAFKA_LISTENERS: ${KAFKA_LISTENERS}
-      KAFKA_ADVERTISED_LISTENERS: ${KAFKA_ADVERTISED_LISTENERS}
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: ${KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR}
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_HOST://0.0.0.0:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
     volumes:
       - kafka-data:/var/lib/kafka/data
     networks:
       - elk-net
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-topics --bootstrap-server localhost:9092 --list || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  # ========================
-  # Elasticsearch (단일 노드)
-  # ========================
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.15.0
     container_name: elasticsearch
     environment:
-      - node.name=${ES_NODE_NAME}
-      - cluster.name=${ES_CLUSTER_NAME}
-      - discovery.type=${ES_DISCOVERY_TYPE}
-      - xpack.security.enabled=${ES_XPACK_SECURITY}
-      - bootstrap.memory_lock=${ES_BOOTSTRAP_MEMORY_LOCK}
-      - ES_JAVA_OPTS=${ES_JAVA_OPTS}
+      - node.name=es01
+      - cluster.name=es-cluster
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - bootstrap.memory_lock=true
+      - ES_JAVA_OPTS=-Xms1g -Xmx1g
     ulimits:
       memlock:
         soft: -1
@@ -61,48 +83,50 @@ services:
     volumes:
       - es-data:/usr/share/elasticsearch/data
     ports:
-      - "${ES_EXTERNAL_PORT}:9200"
+      - "9200:9200"
     networks:
       - elk-net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=60s"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
 
-  # ========================
-  # Kibana
-  # ========================
   kibana:
     image: docker.elastic.co/kibana/kibana:8.15.0
     container_name: kibana
     depends_on:
-      - elasticsearch
+      elasticsearch:
+        condition: service_healthy
     environment:
-      - ELASTICSEARCH_HOSTS=${KIBANA_ES_HOST}
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
     ports:
-      - "${KIBANA_EXTERNAL_PORT}:5601"
+      - "5601:5601"
     networks:
       - elk-net
 
-  # ========================
-  # InfluxDB
-  # ========================
   influxdb:
     image: influxdb:2.7
     container_name: influxdb
     ports:
-      - "${INFLUXDB_EXTERNAL_PORT}:8086"
+      - "8086:8086"
     environment:
-      - DOCKER_INFLUXDB_INIT_USERNAME=${INFLUXDB_USERNAME}
-      - DOCKER_INFLUXDB_INIT_PASSWORD=${INFLUXDB_PASSWORD}
-      - DOCKER_INFLUXDB_INIT_ORG=${FX_INFLUX_ORG}
-      - DOCKER_INFLUXDB_INIT_BUCKET=${FX_INFLUX_BUCKET}
-      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=${FX_INFLUX_TOKEN}
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: ${INFLUXDB_USERNAME}
+      DOCKER_INFLUXDB_INIT_PASSWORD: ${INFLUXDB_PASSWORD}
+      DOCKER_INFLUXDB_INIT_ORG: ${INFLUXDB_ORG}
+      DOCKER_INFLUXDB_INIT_BUCKET: ${INFLUXDB_BUCKET}
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: ${INFLUXDB_API_TOKEN}
     volumes:
       - influxdb-data:/var/lib/influxdb2
     networks:
       - elk-net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:8086/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-
-  # ========================
-  # Grafana
-  # ========================
   grafana:
     image: grafana/grafana:10.4.2
     container_name: grafana
